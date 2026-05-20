@@ -127,8 +127,35 @@ function setToolState(state: ToolState, text: string) {
   if (label) label.textContent = text;
 }
 
+// Internal Composer markers that should never be echoed back in the request.
+const COMPOSER_MARKERS = ["</think>", "<|final|>", "<｜final｜>"];
+
+function sanitizeAssistantContent(content: string) {
+  let markerEnd = 0;
+  for (const marker of COMPOSER_MARKERS) {
+    const markerIndex = content.lastIndexOf(marker);
+    if (markerIndex !== -1) markerEnd = Math.max(markerEnd, markerIndex + marker.length);
+  }
+  return content.slice(markerEnd).trim();
+}
+
+function sanitizeHistory(history: ChatMessage[]): ChatMessage[] {
+  const cleaned: ChatMessage[] = [];
+  for (const message of history) {
+    if (message.role !== "assistant") {
+      cleaned.push(message);
+      continue;
+    }
+    if (message.content.includes("[composer-api error]")) continue;
+    const content = sanitizeAssistantContent(message.content);
+    if (!content) continue;
+    cleaned.push({ role: "assistant", content });
+  }
+  return cleaned;
+}
+
 function requestBody(extraUserMessage?: string): Record<string, unknown> {
-  const outgoing = [...messages];
+  const outgoing = sanitizeHistory(messages);
   if (extraUserMessage) outgoing.push({ role: "user", content: extraUserMessage });
   return {
     model: "composer-2.5",
@@ -236,7 +263,7 @@ chatForm?.addEventListener("submit", async (event) => {
   }
   setBusy(true);
   setToolState("run", "starting run");
-  setStatus("Starting a Cursor Cloud Agent run. First token can take around 20 seconds.");
+  setStatus("Starting a Composer 2.5 stream. The first token can take around 20 seconds.");
 
   const pending = messageNode("assistant", "");
   const pendingBody = pending.querySelector<HTMLElement>(".msg-body");
@@ -266,7 +293,7 @@ chatForm?.addEventListener("submit", async (event) => {
     }
 
     setToolState("wait", "waiting token");
-    setStatus("Run created; waiting for composer-2.5 to send the first token.");
+    setStatus("Connected to the Composer 2.5 stream; waiting for the first token.");
 
     let sawFirstToken = false;
     for await (const delta of readChatStream(response.body)) {
@@ -347,18 +374,46 @@ async function* readChatStream(body: ReadableStream<Uint8Array>): AsyncGenerator
   let buffer = "";
 
   const readEvent = function* (rawEvent: string): Generator<string> {
+    let eventName = "";
+    const dataLines: string[] = [];
     for (const line of rawEvent.split(/\r?\n/)) {
-      if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim();
-      if (!data || data === "[DONE]") continue;
-      try {
-        const chunk = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
-        const content = chunk.choices?.[0]?.delta?.content;
-        if (content) yield content;
-      } catch {
-        /* skip malformed chunk */
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        // Preserve a single optional leading space and any internal whitespace.
+        dataLines.push(line.slice(5).replace(/^ /, ""));
       }
     }
+    const data = dataLines.join("\n").trim();
+
+    if (eventName === "error") {
+      if (!data) throw new Error("composer-2.5 stream reported an error.");
+      let parsed: { error?: { message?: string }; message?: string };
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        throw new Error(data);
+      }
+      throw new Error(parsed.error?.message || parsed.message || data);
+    }
+
+    if (!data || data === "[DONE]") return;
+
+    let chunk: {
+      choices?: Array<{ delta?: { content?: string } }>;
+      error?: { message?: string };
+    };
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      /* skip malformed chunk */
+      return;
+    }
+    if (chunk.error) {
+      throw new Error(chunk.error.message || "composer-2.5 stream reported an error.");
+    }
+    const content = chunk.choices?.[0]?.delta?.content;
+    if (content) yield content;
   };
 
   while (true) {
