@@ -1,4 +1,3 @@
-import "./styles.css";
 import { hydrateIcons, icon, wireCopyButtons } from "./ui";
 import { renderMarkdown } from "./markdown";
 

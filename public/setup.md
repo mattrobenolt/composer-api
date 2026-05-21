@@ -10,6 +10,8 @@ Sign in at [cursor.com/dashboard](https://cursor.com/dashboard), open **Integrat
 
 ## Vercel AI SDK
 
+Use the Vercel AI SDK when you want streaming helpers, framework adapters, and the `streamText` primitives you already use in Next.js or other TypeScript apps. Configure its OpenAI-compatible provider with this proxy as the base URL, then choose a Cursor-backed model id.
+
 ```ts
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
@@ -30,6 +32,8 @@ for await (const delta of result.textStream) {
 ```
 
 ## OpenAI SDK
+
+Use the official OpenAI SDK when you want the broadest drop-in compatibility with existing Chat Completions or Responses code. The only required changes are the `baseURL`, the Bearer token, and the model id.
 
 ::: code-tabs
 
