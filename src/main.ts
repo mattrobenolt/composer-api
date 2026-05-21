@@ -1,495 +1,151 @@
-import {
-  AlertTriangle,
-  BookOpen,
-  CheckCircle,
-  Code,
-  Copy,
-  Github,
-  GitBranch,
-  KeyRound,
-  Link,
-  Lock,
-  MessageSquare,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Terminal,
-  User,
-  Zap,
-  type IconNode
-} from "lucide";
 import "./styles.css";
-
-const icons = {
-  AlertTriangle,
-  BookOpen,
-  CheckCircle,
-  Code,
-  Copy,
-  Github,
-  GitBranch,
-  KeyRound,
-  Link,
-  Lock,
-  MessageSquare,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Terminal,
-  User,
-  Zap
-};
-
-for (const icon of document.querySelectorAll<HTMLElement>("[data-lucide]")) {
-  const name = icon.dataset.lucide || "";
-  const pascal = name
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("") as keyof typeof icons;
-  const Icon = icons[pascal];
-  if (Icon) icon.outerHTML = iconToSvg(Icon, { width: 18, height: 18, "aria-hidden": "true" });
-}
-
-/* ---- endpoints ---- */
+import { escapeAttr, escapeHtml, hydrateIcons, icon, wireCopyButtons } from "./ui";
 
 const origin = window.location.origin;
-const endpoints = {
-  baseUrl: `${origin}/v1`,
-  chatCompletions: `${origin}/v1/chat/completions`,
-  responses: `${origin}/v1/responses`,
-  models: `${origin}/v1/models`
-};
+const baseUrl = `${origin}/v1`;
 
-const endpointList = document.querySelector<HTMLElement>("#endpoint-list");
-if (endpointList) {
-  endpointList.innerHTML = [
-    endpointRow("Base URL", endpoints.baseUrl),
-    endpointRow("Chat Completions", endpoints.chatCompletions),
-    endpointRow("Responses", endpoints.responses),
-    endpointRow("Models", endpoints.models)
-  ].join("");
-  wireCopyButtons(endpointList);
-}
+/* ---------------------------------------------------------------- routing */
 
-function endpointRow(label: string, value: string): string {
-  return `
-    <div class="endpoint-row">
-      <span>${escapeHtml(label)}</span>
-      <code>${escapeHtml(value)}</code>
-      <button class="icon-button" data-copy="${escapeAttr(value)}" aria-label="Copy ${escapeAttr(label)}">
-        ${iconToSvg(Copy, { width: 17, height: 17, "aria-hidden": "true" })}
-      </button>
-    </div>
-  `;
-}
+const isChatRoute = (): boolean => window.location.pathname.replace(/\/+$/, "") === "/chat";
 
-function wireCopyButtons(root: HTMLElement) {
-  root.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(button.dataset.copy || "");
-        button.classList.add("copied");
-        window.setTimeout(() => button.classList.remove("copied"), 900);
-      } catch {
-        /* clipboard unavailable - ignore */
-      }
-    });
-  });
-}
+async function route(): Promise<void> {
+  const landing = document.getElementById("landing");
+  const chatRoot = document.getElementById("chat-root");
+  if (!landing || !chatRoot) return;
+  mountEarlyAccessBar();
 
-/* ---- demo ---- */
-
-type ChatMessage = { role: "user" | "assistant"; content: string };
-
-// The Cursor key lives only in runtime state - never localStorage/sessionStorage.
-const messages: ChatMessage[] = [];
-
-const keyInput = document.querySelector<HTMLInputElement>("#cursor-key");
-const promptInput = document.querySelector<HTMLTextAreaElement>("#prompt");
-const chatForm = document.querySelector<HTMLFormElement>("#chat-form");
-const sendButton = document.querySelector<HTMLButtonElement>("#send");
-const transcript = document.querySelector<HTMLElement>("#transcript");
-const status = document.querySelector<HTMLElement>("#status");
-
-const reqBody = document.querySelector<HTMLElement>("#req-body");
-const toolState = document.querySelector<HTMLElement>("#tool-state");
-
-let busy = false;
-
-type ToolState = "idle" | "run" | "wait" | "stream" | "err";
-
-function setToolState(state: ToolState, text: string) {
-  if (!toolState) return;
-  toolState.dataset.state = state;
-  const label = toolState.querySelector<HTMLElement>(".tool-state-text");
-  if (label) label.textContent = text;
-}
-
-// Internal Composer markers that should never be echoed back in the request.
-const COMPOSER_MARKER_PATTERN = /<\/think>|<\s*[|｜]\s*final\s*[|｜]\s*>/g;
-
-function sanitizeAssistantContent(content: string) {
-  let markerEnd = 0;
-  const markerPattern = new RegExp(COMPOSER_MARKER_PATTERN);
-  let match: RegExpExecArray | null;
-  while ((match = markerPattern.exec(content))) {
-    markerEnd = Math.max(markerEnd, match.index + match[0].length);
-  }
-  return content.slice(markerEnd).trim();
-}
-
-function sanitizeHistory(history: ChatMessage[]): ChatMessage[] {
-  const cleaned: ChatMessage[] = [];
-  for (const message of history) {
-    if (message.role !== "assistant") {
-      cleaned.push(message);
-      continue;
-    }
-    if (message.content.includes("[composer-api error]")) continue;
-    const content = sanitizeAssistantContent(message.content);
-    if (!content) continue;
-    cleaned.push({ role: "assistant", content });
-  }
-  return cleaned;
-}
-
-function requestBody(extraUserMessage?: string): Record<string, unknown> {
-  const outgoing = sanitizeHistory(messages);
-  if (extraUserMessage) outgoing.push({ role: "user", content: extraUserMessage });
-  return {
-    model: "composer-2.5",
-    messages: outgoing,
-    stream: true
-  };
-}
-
-function renderRequestPreview() {
-  const draft = promptInput?.value.trim() || "";
-  if (reqBody) reqBody.innerHTML = highlightJson(JSON.stringify(requestBody(draft || undefined), null, 2));
-}
-
-function renderTranscript(streaming?: HTMLElement) {
-  if (!transcript) return;
-  if (!messages.length && !streaming) {
-    transcript.innerHTML = `
-      <div class="transcript-empty">
-        ${iconToSvg(Sparkles, { width: 22, height: 22, "aria-hidden": "true" })}
-        <span>Enter a key and a prompt to start.</span>
-      </div>`;
-    return;
-  }
-  transcript.innerHTML = "";
-  for (const message of messages) transcript.appendChild(messageNode(message.role, message.content));
-  if (streaming) transcript.appendChild(streaming);
-  transcript.scrollTop = transcript.scrollHeight;
-}
-
-function messageNode(role: "user" | "assistant", content: string): HTMLElement {
-  const node = document.createElement("div");
-  node.className = `msg msg-${role}`;
-  const icon = role === "user" ? User : Sparkles;
-  node.innerHTML = `
-    <span class="msg-avatar">${iconToSvg(icon, { width: 15, height: 15, "aria-hidden": "true" })}</span>
-    <div class="msg-body"></div>`;
-  const body = node.querySelector<HTMLElement>(".msg-body");
-  if (body) body.textContent = role === "assistant" ? sanitizeAssistantContent(content) : content;
-  return node;
-}
-
-function setStatus(message: string, tone?: "ok" | "err") {
-  if (!status) return;
-  const text = status.querySelector<HTMLElement>(".status-text");
-  const isDefault = message === "";
-  if (text) {
-    text.textContent = isDefault
-      ? "Your key stays in this tab - it is never written to storage."
-      : message;
-  }
-  status.dataset.tone = isDefault ? "" : tone || "";
-  const iconSvg = status.querySelector("svg");
-  if (iconSvg) {
-    const nextIcon = tone === "err" ? AlertTriangle : tone === "ok" ? CheckCircle : Lock;
-    iconSvg.outerHTML = iconToSvg(nextIcon, { width: 14, height: 14, class: "status-icon", "aria-hidden": "true" });
+  if (isChatRoute()) {
+    landing.hidden = true;
+    chatRoot.hidden = false;
+    document.title = "Cursor Chat — The Unofficial Cursor API";
+    const { mountChat } = await import("./chat");
+    mountChat(chatRoot);
+  } else {
+    chatRoot.hidden = true;
+    landing.hidden = false;
+    document.title = "The Unofficial Cursor API";
+    mountLanding();
   }
 }
 
-function setBusy(value: boolean) {
-  busy = value;
-  if (sendButton) sendButton.disabled = value;
-  if (promptInput) promptInput.disabled = value;
-}
-
-promptInput?.addEventListener("input", () => {
-  renderRequestPreview();
-  autoGrow();
-});
-
-function autoGrow() {
-  if (!promptInput) return;
-  promptInput.style.height = "auto";
-  promptInput.style.height = `${Math.min(promptInput.scrollHeight, 160)}px`;
-}
-
-promptInput?.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    chatForm?.requestSubmit();
-  }
-});
-
-chatForm?.addEventListener("submit", async (event) => {
+// Intercept same-origin links so navigation between `/` and `/chat` is instant.
+document.addEventListener("click", (event) => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+  const anchor = (event.target as HTMLElement | null)?.closest("a");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href") || "";
+  if (href !== "/" && href !== "/chat") return;
+  if (anchor.target === "_blank") return;
   event.preventDefault();
-  if (busy) return;
-
-  const key = keyInput?.value.trim() || "";
-  const prompt = promptInput?.value.trim() || "";
-  if (!key) {
-    setStatus("Enter your Cursor API key first.", "err");
-    setToolState("err", "missing key");
-    keyInput?.focus();
-    return;
-  }
-  if (!prompt) {
-    setStatus("Type a prompt to send.", "err");
-    setToolState("err", "empty prompt");
-    return;
-  }
-
-  messages.push({ role: "user", content: prompt });
-  if (promptInput) {
-    promptInput.value = "";
-    autoGrow();
-  }
-  setBusy(true);
-  setToolState("run", "starting run");
-  setStatus("Starting a Composer 2.5 stream. The first token can take around 20 seconds.");
-
-  const pending = messageNode("assistant", "");
-  const pendingBody = pending.querySelector<HTMLElement>(".msg-body");
-  pending.classList.add("is-streaming");
-  renderTranscript(pending);
-  renderRequestPreview();
-
-  let received = "";
-  const typewriter = createTypewriter((text) => {
-    if (pendingBody) pendingBody.textContent = text;
-    if (transcript) transcript.scrollTop = transcript.scrollHeight;
-  });
-
-  try {
-    const response = await fetch(endpoints.chatCompletions, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(requestBody())
-    });
-
-    if (!response.ok || !response.body) {
-      const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-      throw new Error(payload.error?.message || `Request failed with status ${response.status}`);
-    }
-
-    setToolState("wait", "waiting token");
-    setStatus("Connected to the Composer 2.5 stream; waiting for the first token.");
-
-    let sawFirstToken = false;
-    for await (const delta of readChatStream(response.body)) {
-      received += delta;
-      if (!sawFirstToken) {
-        sawFirstToken = true;
-        setToolState("stream", "streaming");
-        setStatus("Streaming response.");
-      }
-      typewriter.enqueue(delta);
-    }
-
-    const answer = await typewriter.done();
-    if (!answer.trim()) throw new Error("composer-2.5 returned an empty response.");
-    messages.push({ role: "assistant", content: answer });
-    renderTranscript();
-    setToolState("idle", "ready");
-    setStatus("");
-  } catch (error) {
-    const partial = typewriter.value || received;
-    if (partial.trim()) messages.push({ role: "assistant", content: partial });
-    renderTranscript();
-    setToolState("err", "error");
-    setStatus(error instanceof Error ? error.message : "Unexpected error", "err");
-  } finally {
-    setBusy(false);
-    renderRequestPreview();
-    promptInput?.focus();
+  if (window.location.pathname !== href) {
+    window.history.pushState({}, "", href);
+    void route();
   }
 });
 
-function createTypewriter(onUpdate: (text: string) => void) {
-  let rendered = "";
-  let queue = "";
-  let draining = false;
-  let drainPromise: Promise<void> = Promise.resolve();
+window.addEventListener("popstate", () => void route());
 
-  const drain = async () => {
-    draining = true;
-    try {
-      while (queue.length) {
-        const size = queue.length > 120 ? 5 : queue.length > 48 ? 3 : 1;
-        rendered += queue.slice(0, size);
-        queue = queue.slice(size);
-        onUpdate(rendered);
-        await sleep(queue.length > 120 ? 6 : 12);
-      }
-    } finally {
-      draining = false;
-    }
-  };
+/* ----------------------------------------------------------- landing page */
 
-  return {
-    get value() {
-      return rendered;
-    },
-    enqueue(text: string) {
-      queue += text;
-      if (!draining) drainPromise = drain();
-    },
-    async done() {
-      while (draining || queue.length) {
-        if (!draining) drainPromise = drain();
-        await drainPromise;
-      }
-      return rendered;
-    }
-  };
+let landingReady = false;
+
+function mountLanding(): void {
+  hydrateIcons(document.getElementById("landing") ?? document);
+  if (landingReady) return;
+  landingReady = true;
+
+  renderEndpoints();
+  renderSnippet("snippet-openai", "openai-sdk.ts", openAiSnippet());
+  renderSnippet("snippet-vercel", "vercel-ai-sdk.ts", vercelSnippet());
+  void loadStars();
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+function renderEndpoints(): void {
+  const list = document.getElementById("endpoint-list");
+  if (!list) return;
+  const rows: Array<[string, string]> = [
+    ["Base URL", baseUrl],
+    ["Chat Completions", `${baseUrl}/chat/completions`],
+    ["Responses", `${baseUrl}/responses`],
+    ["Models", `${baseUrl}/models`]
+  ];
+  list.innerHTML = rows
+    .map(
+      ([label, value]) => `
+      <div class="endpoint-row">
+        <span class="endpoint-label">${escapeHtml(label)}</span>
+        <code>${escapeHtml(value)}</code>
+        <button class="icon-button" data-copy="${escapeAttr(value)}" aria-label="Copy ${escapeAttr(label)}">
+          ${icon("Copy", { width: 16, height: 16 })}
+        </button>
+      </div>`
+    )
+    .join("");
+  wireCopyButtons(list);
 }
 
-async function* readChatStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const readEvent = function* (rawEvent: string): Generator<string> {
-    let eventName = "";
-    const dataLines: string[] = [];
-    for (const line of rawEvent.split(/\r?\n/)) {
-      if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        // Preserve a single optional leading space and any internal whitespace.
-        dataLines.push(line.slice(5).replace(/^ /, ""));
-      }
-    }
-    const data = dataLines.join("\n").trim();
-
-    if (eventName === "error") {
-      if (!data) throw new Error("composer-2.5 stream reported an error.");
-      let parsed: { error?: { message?: string }; message?: string };
-      try {
-        parsed = JSON.parse(data);
-      } catch {
-        throw new Error(data);
-      }
-      throw new Error(parsed.error?.message || parsed.message || data);
-    }
-
-    if (!data || data === "[DONE]") return;
-
-    let chunk: {
-      choices?: Array<{ delta?: { content?: string } }>;
-      error?: { message?: string };
-    };
-    try {
-      chunk = JSON.parse(data);
-    } catch {
-      /* skip malformed chunk */
-      return;
-    }
-    if (chunk.error) {
-      throw new Error(chunk.error.message || "composer-2.5 stream reported an error.");
-    }
-    const content = chunk.choices?.[0]?.delta?.content;
-    if (content) yield content;
-  };
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      buffer += decoder.decode();
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-    let boundary = findSseBoundary(buffer);
-    while (boundary !== -1) {
-      const rawEvent = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + boundaryLength(buffer, boundary));
-      for (const content of readEvent(rawEvent)) yield content;
-      boundary = findSseBoundary(buffer);
-    }
-  }
-
-  if (buffer.trim()) {
-    for (const content of readEvent(buffer)) yield content;
-  }
+function renderSnippet(targetId: string, filename: string, code: string): void {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.innerHTML = `
+    <figure class="snippet">
+      <figcaption class="snippet-bar">
+        <span class="snippet-name">${icon("Code2", { width: 14, height: 14 })}${escapeHtml(filename)}</span>
+        <button class="snippet-copy icon-button" data-copy="${escapeAttr(code)}" aria-label="Copy ${escapeAttr(filename)}">
+          ${icon("Copy", { width: 16, height: 16 })}
+        </button>
+      </figcaption>
+      <pre><code>${escapeHtml(code)}</code></pre>
+    </figure>`;
+  wireCopyButtons(target);
 }
 
-function findSseBoundary(buffer: string) {
-  const lf = buffer.indexOf("\n\n");
-  const crlf = buffer.indexOf("\r\n\r\n");
-  if (lf === -1) return crlf;
-  if (crlf === -1) return lf;
-  return Math.min(lf, crlf);
+function openAiSnippet(): string {
+  return `import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.CURSOR_API_KEY,
+  baseURL: "${baseUrl}"
+});
+
+// Chat Completions — supported, drop-in compatible
+const chat = await client.chat.completions.create({
+  model: "composer-2.5",
+  messages: [{ role: "user", content: "Explain async iterators." }]
+});
+console.log(chat.choices[0].message.content);
+
+// Responses API — recommended for new projects
+const response = await client.responses.create({
+  model: "composer-2.5",
+  input: "Explain async iterators."
+});
+console.log(response.output_text);`;
 }
 
-function boundaryLength(buffer: string, index: number) {
-  return buffer.startsWith("\r\n\r\n", index) ? 4 : 2;
+function vercelSnippet(): string {
+  return `import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+const openai = createOpenAI({
+  apiKey: process.env.CURSOR_API_KEY,
+  baseURL: "${baseUrl}"
+});
+
+const result = streamText({
+  // openai.responses(id) or openai.chat(id)
+  model: openai.responses("composer-2.5"),
+  prompt: "Explain async iterators."
+});
+
+for await (const delta of result.textStream) {
+  process.stdout.write(delta);
+}`;
 }
 
-function highlightJson(json: string) {
-  return json.replace(
-    /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}\[\],]/g,
-    (match, stringToken: string | undefined, keySuffix: string | undefined) => {
-      if (stringToken) {
-        const className = keySuffix ? "j-key" : "j-str";
-        const suffix = keySuffix ? keySuffix.replace(":", '<span class="j-punc">:</span>') : "";
-        return `<span class="${className}">${escapeHtml(stringToken)}</span>${suffix}`;
-      }
-      if (match === "true" || match === "false" || match === "null") {
-        return `<span class="j-bool">${match}</span>`;
-      }
-      if (/^-?\d/.test(match)) return `<span class="j-num">${match}</span>`;
-      return `<span class="j-punc">${escapeHtml(match)}</span>`;
-    }
-  );
-}
+/* ----------------------------------------------------- GitHub star count */
 
-renderRequestPreview();
-renderTranscript();
-setToolState("idle", "ready");
-
-/* ---- shared helpers ---- */
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function escapeAttr(value: string) {
-  return escapeHtml(value).replaceAll("`", "&#096;");
-}
-
-const starValue = document.querySelector<HTMLElement>("#star-value");
-
-function formatStars(count: number) {
+function formatStars(count: number): string {
   if (count >= 1000) {
     const thousands = count / 1000;
     return `${thousands.toFixed(thousands >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
@@ -497,7 +153,8 @@ function formatStars(count: number) {
   return String(count);
 }
 
-async function loadStars() {
+async function loadStars(): Promise<void> {
+  const starValue = document.getElementById("star-value");
   if (!starValue) return;
   try {
     const response = await fetch("https://api.github.com/repos/standardagents/composer-api", {
@@ -508,32 +165,97 @@ async function loadStars() {
     if (typeof data.stargazers_count !== "number") throw new Error("Missing star count");
     starValue.textContent = formatStars(data.stargazers_count);
   } catch {
-    starValue.textContent = "Stars";
+    starValue.textContent = "Star";
   }
 }
 
-void loadStars();
+/* --------------------------------------------- Standard Agents CTA bar */
 
-function iconToSvg(icon: IconNode, attrs: Record<string, string | number>) {
-  const attrText = Object.entries({
-    xmlns: "http://www.w3.org/2000/svg",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": 2,
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    ...attrs
-  })
-    .map(([key, value]) => `${key}="${escapeAttr(String(value))}"`)
-    .join(" ");
-  const children = icon
-    .map(([tag, childAttrs]) => {
-      const childAttrText = Object.entries(childAttrs)
-        .map(([key, value]) => `${key}="${escapeAttr(String(value))}"`)
-        .join(" ");
-      return `<${tag} ${childAttrText}></${tag}>`;
-    })
-    .join("");
-  return `<svg ${attrText}>${children}</svg>`;
+let earlyAccessReady = false;
+
+function mountEarlyAccessBar(): void {
+  if (earlyAccessReady) return;
+  earlyAccessReady = true;
+
+  const bar = document.createElement("aside");
+  bar.id = "sa-bar";
+  bar.className = "sa-bar";
+  bar.setAttribute("aria-label", "Standard Agents early access");
+  bar.innerHTML = `
+    <div class="sa-bar-inner">
+      <div class="sa-bar-pitch">
+        <img class="sa-bar-mark" src="/standard-agents-logo.svg" alt="Standard Agents" />
+        <p>Standard Agents is building reliable agent infrastructure. Get early access.</p>
+      </div>
+      <form id="sa-bar-form" class="sa-bar-form" novalidate>
+        <input id="sa-bar-name" name="name" type="text" placeholder="Name" autocomplete="name" required />
+        <input id="sa-bar-email" name="email" type="email" placeholder="Email" autocomplete="email" required />
+        <button id="sa-bar-submit" class="sa-bar-submit" type="submit">
+          <span class="sa-bar-submit-label">Request access</span>
+          ${icon("ArrowRight", { width: 16, height: 16, class: "sa-bar-arrow" })}
+          ${icon("Loader2", { width: 16, height: 16, class: "sa-bar-spinner spin" })}
+        </button>
+      </form>
+      <p id="sa-bar-status" class="sa-bar-status" role="status"></p>
+    </div>`;
+  document.body.appendChild(bar);
+  bindEarlyAccessForm(bar);
 }
+
+function bindEarlyAccessForm(bar: HTMLElement): void {
+  const form = bar.querySelector<HTMLFormElement>("#sa-bar-form");
+  const submit = bar.querySelector<HTMLButtonElement>("#sa-bar-submit");
+  const status = bar.querySelector<HTMLElement>("#sa-bar-status");
+  const nameInput = bar.querySelector<HTMLInputElement>("#sa-bar-name");
+  const emailInput = bar.querySelector<HTMLInputElement>("#sa-bar-email");
+  const label = submit?.querySelector<HTMLElement>(".sa-bar-submit-label");
+  const arrow = submit?.querySelector<SVGElement>(".sa-bar-arrow");
+  const spinner = submit?.querySelector<SVGElement>(".sa-bar-spinner");
+  if (!form) return;
+
+  const setStatus = (text: string, tone?: "ok" | "err"): void => {
+    if (!status) return;
+    status.textContent = text;
+    if (tone) status.dataset.tone = tone;
+    else delete status.dataset.tone;
+  };
+
+  const setBusy = (busy: boolean): void => {
+    if (submit) submit.disabled = busy;
+    if (label) label.style.display = busy ? "none" : "";
+    if (arrow) arrow.style.display = busy ? "none" : "";
+    if (spinner) spinner.style.display = busy ? "" : "none";
+  };
+  setBusy(false);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = nameInput?.value.trim() || "";
+    const email = emailInput?.value.trim() || "";
+    if (!name || !email) {
+      setStatus("Add your name and email first.", "err");
+      return;
+    }
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/early-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email })
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: { message?: string } | string };
+      if (!response.ok || !data.ok) {
+        const message = typeof data.error === "string" ? data.error : data.error?.message;
+        throw new Error(message || "Could not submit right now.");
+      }
+      bar.classList.add("sa-bar--done");
+      setStatus("You're on the list — we'll be in touch.", "ok");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Something went wrong.", "err");
+      setBusy(false);
+    }
+  });
+}
+
+void route();

@@ -23,7 +23,7 @@
     "CURSOR_API_BASE": "https://api.cursor.com",
     "CURSOR_BACKEND_BASE_URL": "private-cursor-backend-origin",
     "CURSOR_CLIENT_VERSION": "2.6.22",
-    "WAITLIST_SOURCE": "composer-api"
+    "WAITLIST_SOURCE": "cursor-api"
   }
   // Required secret:
   // ENCRYPTION_KEY - 32+ random bytes as hex/base64/plain text, used to encrypt Cursor API keys at rest.

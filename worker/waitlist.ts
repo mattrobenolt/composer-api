@@ -29,7 +29,7 @@ export async function submitWaitlist(
       body: JSON.stringify({
         name,
         email,
-        source: input.source || env.WAITLIST_SOURCE || "composer-api"
+        source: input.source || env.WAITLIST_SOURCE || "cursor-api"
       })
     });
     return response.ok;

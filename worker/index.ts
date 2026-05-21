@@ -47,13 +47,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
       return await handleSignup(request, env, ctx, deps);
     }
     if (url.pathname === "/api/early-access" && request.method === "POST") {
-      const body = (await parseJsonBody<Record<string, unknown>>(request).catch(() => ({}))) as Record<string, unknown>;
-      const ok = await submitWaitlist(env, deps, {
-        name: typeof body.name === "string" ? body.name : undefined,
-        email: typeof body.email === "string" ? body.email : undefined,
-        source: env.WAITLIST_SOURCE || "composer-api"
-      });
-      return json({ ok });
+      return await handleEarlyAccess(request, env, deps);
     }
 
     const route = matchOpenAiRoute(url.pathname);
@@ -61,13 +55,48 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
       return await handleOpenAiRoute(request, env, ctx, deps, route);
     }
 
-    if (isDocumentRequest(request, url)) {
-      return withCors(await env.ASSETS.fetch(request));
+    // Client-side routes (e.g. `/chat`) have no matching asset; serve the SPA
+    // shell so the front-end router can take over.
+    if (isDocumentRequest(request, url) && url.pathname !== "/") {
+      const indexRequest = new Request(new URL("/", url).toString(), {
+        method: "GET",
+        headers: request.headers
+      });
+      return withCors(await env.ASSETS.fetch(indexRequest));
     }
     return withCors(await env.ASSETS.fetch(request));
   } catch (error) {
     return errorResponse(error);
   }
+}
+
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/**
+ * Standard Agents early-access capture. The upstream waitlist token
+ * (`WAITLIST_API_TOKEN`) lives only in worker env and is never exposed to the
+ * browser; the client posts here and we forward server-side.
+ */
+async function handleEarlyAccess(request: Request, env: Env, deps: Deps): Promise<Response> {
+  const body = (await parseJsonBody<Record<string, unknown>>(request).catch(() => ({}))) as Record<string, unknown>;
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+
+  if (!name) return openAiError("Your name is required.", 400, "invalid_request_error", "name");
+  if (!email) return openAiError("Your email is required.", 400, "invalid_request_error", "email");
+  if (!EMAIL_PATTERN.test(email)) {
+    return openAiError("Enter a valid email address.", 400, "invalid_request_error", "email");
+  }
+
+  const ok = await submitWaitlist(env, deps, {
+    name,
+    email,
+    source: env.WAITLIST_SOURCE || "cursor-api"
+  });
+  if (!ok) {
+    return json({ ok: false, error: "Could not reach the early access list. Please try again shortly." }, { status: 502 });
+  }
+  return json({ ok: true });
 }
 
 async function handleSignup(request: Request, env: Env, ctx: ExecutionContext, deps: Deps): Promise<Response> {

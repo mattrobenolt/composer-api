@@ -5,29 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#1c1d18" />
-    <title>The missing Composer 2.5 API</title>
-    <meta name="description" content="Chat completions and responses api for composer 2.5." />
+
+    <title>The Unofficial Cursor API</title>
+    <meta
+      name="description"
+      content="Standard API endpoints for Cursor — drop-in OpenAI-compatible /v1/chat/completions and /v1/responses, powered by your own Cursor key."
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="The Unofficial Cursor API" />
+    <meta
+      property="og:description"
+      content="Standard API endpoints for Cursor — drop-in OpenAI-compatible /v1/chat/completions and /v1/responses, powered by your own Cursor key."
+    />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The Unofficial Cursor API" />
+    <meta
+      name="twitter:description"
+      content="Standard API endpoints for Cursor — drop-in OpenAI-compatible /v1/chat/completions and /v1/responses."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
   </head>
   <body>
-    <div class="bg-texture" aria-hidden="true"></div>
-
-    <main id="app">
-      <section class="shell">
+    <main id="landing">
+      <div class="shell">
         <header class="topbar">
-          <a class="brand" href="/" aria-label="Standard Agents Composer API">
+          <a class="brand" href="/" aria-label="Standard Agents — Cursor API">
             <img class="brand-logo" src="/standard-agents-logo.svg" alt="Standard Agents" />
             <span class="brand-divider" aria-hidden="true"></span>
-            <span class="brand-product">Composer&nbsp;API</span>
+            <span class="brand-product">Cursor&nbsp;API</span>
           </a>
 
           <nav class="top-actions" aria-label="Primary">
-            <a class="docs-link" href="https://github.com/standardagents/composer-api#readme" target="_blank" rel="noreferrer">
+            <a class="top-link" href="/chat">
+              <i data-lucide="message-square-plus"></i>
+              <span>Cursor Chat</span>
+            </a>
+            <a class="top-link" href="#docs">
               <i data-lucide="book-open"></i>
               <span>Docs</span>
             </a>
             <a
               id="repo-link"
-              class="repo-link"
+              class="top-link"
               href="https://github.com/standardagents/composer-api"
               target="_blank"
               rel="noreferrer"
@@ -43,112 +67,102 @@
         </header>
 
         <section class="hero" aria-labelledby="hero-title">
-          <span class="hero-badge">
+          <img class="hero-mark" src="/cursor-logo.svg" alt="Cursor" width="48" height="48" />
+          <h1 id="hero-title">The Unofficial<br />Cursor API</h1>
+          <p class="hero-lede">
+            Cursor is a great editor &mdash; but it ships without the standard API endpoints you
+            expect from a model provider. This fills that gap: drop-in
+            <code>/v1/chat/completions</code> and <code>/v1/responses</code>, authenticated with
+            your own Cursor key.
+          </p>
+          <p class="hero-note">
             <i data-lucide="zap"></i>
-            OpenAI-SDK compatible
-          </span>
-          <h1 id="hero-title">The missing Composer 2.5 API</h1>
-          <p class="subtitle">Chat completions and responses api for composer 2.5</p>
+            Free to use for now &mdash; while it isn&rsquo;t costing us much to run.
+          </p>
 
-          <ul class="hero-points">
-            <li><i data-lucide="terminal"></i> Drop-in <code>/v1/chat/completions</code></li>
-            <li><i data-lucide="git-branch"></i> Native <code>/v1/responses</code></li>
-            <li><i data-lucide="shield-check"></i> Bring your own Cursor key &mdash; never stored</li>
-          </ul>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="/chat">
+              <i data-lucide="message-square-plus"></i>
+              Open Cursor Chat
+            </a>
+            <a class="btn btn-ghost" href="#docs">
+              <i data-lucide="book-open"></i>
+              Read the setup docs
+            </a>
+          </div>
         </section>
 
-        <section class="panel endpoints-panel" aria-labelledby="endpoints-title">
-          <div class="panel-heading">
-            <span class="panel-kicker">
-              <i data-lucide="link"></i>
-              Endpoints
-            </span>
-            <h2 id="endpoints-title">Point your OpenAI client here</h2>
-            <p>
-              Authenticate with <code>Authorization: Bearer &lt;your-cursor-api-key&gt;</code>. Your key is forwarded to
-              Cursor per request and never stored.
-            </p>
-          </div>
-          <div id="endpoint-list" class="endpoint-list"></div>
-        </section>
+        <section id="docs" class="docs" aria-labelledby="docs-title">
+          <header class="docs-head">
+            <span class="kicker"><i data-lucide="terminal"></i> Setup</span>
+            <h2 id="docs-title">Point any OpenAI client at Cursor</h2>
+            <p>Four steps from a Cursor key to streaming completions.</p>
+          </header>
 
-        <section class="demo" aria-labelledby="demo-title">
-          <div class="demo-head">
-            <h2 id="demo-title">Try it out</h2>
-            <p>Live in your browser against <code>/v1/chat/completions</code>.</p>
-          </div>
-
-          <div class="tool">
-            <div class="tool-bar">
-              <span class="tool-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="tool-route">
-                <span class="tool-method">POST</span>
-                <span class="tool-path">/v1/chat/completions</span>
-              </span>
-              <span id="tool-state" class="tool-state" data-state="idle">
-                <span class="tool-state-dot" aria-hidden="true"></span>
-                <span class="tool-state-text">idle</span>
-              </span>
-            </div>
-
-            <div class="tool-body">
-              <div class="tool-pane pane-chat">
-                <div class="pane-label">
-                  <i data-lucide="message-square"></i>
-                  <span>Chat</span>
-                </div>
-
-                <label class="key-field">
-                  <span class="label-text">
-                    <i data-lucide="key-round"></i>
-                    Cursor API key
-                  </span>
-                  <input id="cursor-key" name="cursorKey" autocomplete="off" type="password" placeholder="Paste Cursor key" />
-                </label>
-
-                <div id="transcript" class="transcript" aria-live="polite">
-                  <div class="transcript-empty">
-                    <i data-lucide="sparkles"></i>
-                    <span>Enter a key and a prompt to start.</span>
-                  </div>
-                </div>
-
-                <form id="chat-form" class="prompt-row">
-                  <textarea
-                    id="prompt"
-                    name="prompt"
-                    rows="1"
-                    placeholder="Ask composer-2.5..."
-                  ></textarea>
-                  <button id="send" class="primary send-button" type="submit" aria-label="Send">
-                    <i data-lucide="send"></i>
-                  </button>
-                </form>
-
-                <p id="status" class="status" role="status">
-                  <i data-lucide="lock" class="status-icon"></i>
-                  <span class="status-text">Your key stays in this tab &mdash; it is never written to storage.</span>
-                </p>
+          <ol class="docs-steps">
+            <li class="doc-step" id="step-key">
+              <div class="doc-step-head">
+                <span class="doc-step-num">1</span>
+                <h3>Get a Cursor API key</h3>
               </div>
+              <p>
+                Sign in at
+                <a href="https://cursor.com/dashboard" target="_blank" rel="noreferrer">cursor.com/dashboard</a>,
+                open <strong>Integrations &rarr; API Keys</strong>, and create a key. It looks like
+                <code>key_&hellip;</code>. Treat it like a password &mdash; this site forwards it
+                straight to Cursor and never stores it.
+              </p>
+            </li>
 
-              <div class="tool-pane pane-req" aria-labelledby="request-title">
-                <div class="pane-label" id="request-title">
-                  <i data-lucide="code"></i>
-                  <span>Request body</span>
-                </div>
-                <pre class="req-pre"><code id="req-body"></code></pre>
+            <li class="doc-step" id="step-endpoints">
+              <div class="doc-step-head">
+                <span class="doc-step-num">2</span>
+                <h3>Use the base URL and Bearer token</h3>
               </div>
-            </div>
-          </div>
+              <p>
+                Send <code>Authorization: Bearer &lt;your-cursor-api-key&gt;</code> to either
+                endpoint below.
+              </p>
+              <div id="endpoint-list" class="endpoint-list"></div>
+            </li>
+
+            <li class="doc-step" id="step-openai">
+              <div class="doc-step-head">
+                <span class="doc-step-num">3</span>
+                <h3>OpenAI SDK</h3>
+              </div>
+              <p>
+                Set <code>baseURL</code> and <code>apiKey</code>. Chat Completions still works
+                everywhere; the Responses API is what OpenAI now recommends for new projects.
+              </p>
+              <div id="snippet-openai"></div>
+            </li>
+
+            <li class="doc-step" id="step-vercel">
+              <div class="doc-step-head">
+                <span class="doc-step-num">4</span>
+                <h3>Vercel AI SDK</h3>
+              </div>
+              <p>
+                Create a provider with <code>createOpenAI</code>, then pick
+                <code>openai.responses(&hellip;)</code> or <code>openai.chat(&hellip;)</code> and
+                pass it to <code>streamText</code>.
+              </p>
+              <div id="snippet-vercel"></div>
+            </li>
+          </ol>
         </section>
 
         <footer class="site-footer">
           <span>Built by <a href="https://github.com/standardagents" target="_blank" rel="noreferrer">Standard Agents</a></span>
           <span class="footer-dot" aria-hidden="true">&middot;</span>
-          <span>Composer is a trademark of Anysphere. Not affiliated.</span>
+          <span>Cursor is a trademark of Anysphere. Not affiliated.</span>
         </footer>
-      </section>
+      </div>
     </main>
+
+    <div id="chat-root" hidden></div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
