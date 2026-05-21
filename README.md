@@ -1,15 +1,15 @@
 # Composer API
 
-OpenAI-compatible `chat.completions` and `responses` endpoints backed by Cursor Composer through Cursor's internal Cursor adapter stream.
+OpenAI-compatible `chat.completions` and `responses` endpoints backed by Cursor Composer.
 
 Live deployment: https://cursor-api.standardagents.ai
 
 ## What this is
 
-Cursor does not expose Composer 2.5 as a raw OpenAI-compatible model endpoint. This Worker adapts OpenAI-style requests to Cursor's internal `Cursor adapter/CursorChatEndpoint` endpoint:
+Cursor does not expose Composer 2.5 as a raw OpenAI-compatible model endpoint. This Worker adapts OpenAI-style requests into the format Cursor accepts:
 
 - `POST /auth/exchange_user_api_key`
-- `POST /private-cursor-chat-endpoint`
+- a private Cursor chat endpoint configured with `CURSOR_CHAT_ENDPOINT`
 
 Each request is stateless from the caller's perspective: the Worker creates a fresh request/conversation id, sends the full prompt, disables Cursor-side tools, streams text back, and does not create a Cursor Cloud Agent.
 
@@ -61,7 +61,7 @@ never forwarded to Cursor as a Cursor key.
 
 This project supports text and image input, non-streaming and streaming output, JSON-output prompt constraints, and the common SDK response shapes. Image inputs can be sent as Chat Completions `image_url` parts or Responses `input_image` parts; each resolved image must be 1MB or smaller.
 
-These OpenAI features are intentionally rejected because Cursor's Cursor adapter stream does not expose equivalent OpenAI controls:
+These OpenAI features are intentionally rejected because Cursor does not expose equivalent OpenAI controls through this path:
 
 - `n` greater than `1`
 - `logprobs` and `top_logprobs`
@@ -85,6 +85,7 @@ Create a local `.dev.vars` file:
 ENCRYPTION_KEY="replace-with-a-long-random-secret"
 WAITLIST_API_TOKEN="optional-standard-agents-waitlist-token"
 CURSOR_BACKEND_BASE_URL="private-cursor-backend-origin"
+CURSOR_CHAT_ENDPOINT="private-cursor-chat-endpoint"
 CURSOR_CLIENT_VERSION="2.6.22"
 ```
 
@@ -100,10 +101,12 @@ npm run db:migrate:remote
 npm run deploy
 ```
 
-Required secret:
+Required secrets:
 
 ```bash
 wrangler secret put ENCRYPTION_KEY
+wrangler secret put CURSOR_BACKEND_BASE_URL
+wrangler secret put CURSOR_CHAT_ENDPOINT
 ```
 
 Optional secret for direct waitlist writes. If omitted, the Worker falls back to the deployed token-cost early-access endpoint.
@@ -117,7 +120,6 @@ wrangler secret put WAITLIST_API_TOKEN
 - Cursor SDK package: `@cursor/sdk@1.0.13`
 - Cursor SDK TypeScript docs: https://cursor.com/docs/api/sdk/typescript
 - Cursor Composer 2.5 changelog: https://cursor.com/changelog/composer-2-5
-- Reverse-engineered Cursor Cursor adapter client/protobuf reference: https://github.com/private-reference
 - OpenAI Chat Completions reference: https://developers.openai.com/api/docs/api-reference/chat
 - OpenAI Responses reference: https://developers.openai.com/api/docs/api-reference/responses
 - OpenAI migration guide: https://developers.openai.com/api/docs/guides/migrate-to-responses

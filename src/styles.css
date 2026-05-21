@@ -199,11 +199,11 @@ code {
 .hero-watermark {
   position: absolute;
   z-index: -1;
-  top: -86px;
-  right: clamp(-180px, -18vw, -46px);
-  width: min(460px, 76vw);
+  top: -106px;
+  right: clamp(-260px, -24vw, -110px);
+  width: min(560px, 88vw);
   height: auto;
-  opacity: 0.055;
+  opacity: 0.06;
   filter: grayscale(1);
   pointer-events: none;
   user-select: none;
@@ -728,10 +728,11 @@ code {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   min-height: var(--sa-bar-offset);
   padding: 5px 0;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .sa-bar-pitch {
@@ -752,7 +753,10 @@ code {
   color: var(--text-dim);
   font-size: 0.72rem;
   line-height: 1.2;
-  max-width: 270px;
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sa-bar-form {
@@ -760,6 +764,7 @@ code {
   gap: 5px;
   flex: none;
   flex-wrap: nowrap;
+  margin-left: auto;
 }
 
 .sa-bar-form input {
@@ -1875,10 +1880,10 @@ code {
   }
 
   .hero-watermark {
-    top: -54px;
-    right: -96px;
-    width: 300px;
-    opacity: 0.045;
+    top: -62px;
+    right: -146px;
+    width: 380px;
+    opacity: 0.05;
   }
 
   .hero-lede {

@@ -4,6 +4,7 @@ export interface Env {
   ENCRYPTION_KEY?: string;
   CURSOR_API_BASE?: string;
   CURSOR_BACKEND_BASE_URL?: string;
+  CURSOR_CHAT_ENDPOINT?: string;
   CURSOR_CLIENT_VERSION?: string;
   WAITLIST_API_TOKEN?: string;
   WAITLIST_SOURCE?: string;

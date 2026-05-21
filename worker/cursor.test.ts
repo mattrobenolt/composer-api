@@ -9,7 +9,7 @@ describe("Cursor stream adapter", () => {
   });
 
   it("encodes attached images into the user ConversationMessage", () => {
-    const body = cursorTestExports.encodeCursorChatChatRequest({
+    const body = cursorTestExports.encodeCursorChatRequest({
       prompt: { text: "Describe this image." },
       images: [
         {
@@ -37,7 +37,7 @@ describe("Cursor stream adapter", () => {
     expect(bytesField(image, 3)).toEqual(new TextEncoder().encode("image-test"));
   });
 
-  it("extracts final text from raw Cursor adapter Connect/protobuf frames", async () => {
+  it("extracts final text from raw Cursor Connect/protobuf frames", async () => {
     const response = new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {
@@ -58,7 +58,7 @@ describe("Cursor stream adapter", () => {
     ]);
   });
 
-  it("strips Composer thinking before yielding final Cursor adapter text", async () => {
+  it("strips Composer thinking before yielding final Cursor text", async () => {
     const response = new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {

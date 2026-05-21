@@ -35,12 +35,13 @@
   ],
   "vars": {
     "CURSOR_API_BASE": "https://api.cursor.com",
-    "CURSOR_BACKEND_BASE_URL": "private-cursor-backend-origin",
     "CURSOR_CLIENT_VERSION": "2.6.22",
     "WAITLIST_SOURCE": "cursor-api"
   }
   // Required secret:
   // ENCRYPTION_KEY - 32+ random bytes as hex/base64/plain text, used to encrypt Cursor API keys at rest.
+  // CURSOR_BACKEND_BASE_URL - private Cursor backend origin.
+  // CURSOR_CHAT_ENDPOINT - private Cursor chat endpoint path or URL.
   // Optional secret:
   // WAITLIST_API_TOKEN - bearer token for https://agents.standardagentbuilder.com/api/waitlist.
 }

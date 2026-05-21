@@ -59,7 +59,7 @@ export async function createCursorCompletion(
   const requestId = deps.randomUUID();
   const conversationId = deps.randomUUID();
   const requestBody = encodeConnectFrame(
-    encodeCursorChatChatRequest({
+    encodeCursorChatRequest({
       prompt: input.prompt,
       images,
       model: input.model?.id || "composer-2.5",
@@ -68,7 +68,7 @@ export async function createCursorCompletion(
       messageId: deps.randomUUID()
     })
   );
-  const response = await cursorInternalRaw(env, deps, accessToken, "/private-cursor-chat-endpoint", {
+  const response = await cursorInternalRaw(env, deps, accessToken, cursorChatEndpoint(env), {
     method: "POST",
     headers: await cursorInternalHeaders(env, accessToken, cursorIdentity, requestId),
     body: requestBody.buffer as ArrayBuffer
@@ -77,7 +77,7 @@ export async function createCursorCompletion(
 }
 
 export const cursorTestExports = {
-  encodeCursorChatChatRequest
+  encodeCursorChatRequest
 };
 
 export interface CursorTextEvent {
@@ -283,8 +283,9 @@ async function cursorInternalRaw(
   path: string,
   init: RequestInit = {}
 ): Promise<Response> {
-  const base = env.CURSOR_BACKEND_BASE_URL || "private-cursor-backend-origin";
-  const url = `${base.replace(/\/$/, "")}${path}`;
+  const base = env.CURSOR_BACKEND_BASE_URL?.trim();
+  if (!base) throw new HttpError("Cursor backend URL is not configured", 500, "cursor_missing_backend_url");
+  const url = /^https?:\/\//.test(path) ? path : `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
   const response = await deps.fetch(url, { ...init, headers });
@@ -296,13 +297,19 @@ async function cursorInternalRaw(
         ? "Invalid Cursor API key"
         : parsed ||
           (response.status === 464
-            ? "Cursor rejected the internal Cursor adapter request. The proxy request is valid, but Cursor refused this account/session."
+            ? "Cursor rejected the proxied chat request. The proxy request is valid, but Cursor refused this account/session."
             : `Cursor internal API request failed with status ${response.status}`);
     const status =
       response.status === 401 ? 401 : response.status === 429 ? 429 : response.status >= 500 || response.status === 464 ? 502 : 400;
     throw new HttpError(message, status, response.status === 401 ? "cursor_unauthorized" : "cursor_api_error");
   }
   return response;
+}
+
+function cursorChatEndpoint(env: Env): string {
+  const endpoint = env.CURSOR_CHAT_ENDPOINT?.trim();
+  if (!endpoint) throw new HttpError("Cursor chat endpoint is not configured", 500, "cursor_missing_endpoint");
+  return endpoint;
 }
 
 function parseCursorError(text: string): string | undefined {
@@ -341,7 +348,7 @@ async function cursorInternalHeaders(env: Env, accessToken: string, cursorIdenti
   };
 }
 
-function encodeCursorChatChatRequest(input: {
+function encodeCursorChatRequest(input: {
   prompt: CursorPrompt;
   images?: EncodedCursorImage[];
   model: string;

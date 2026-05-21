@@ -25,7 +25,7 @@ export function prepareChatRequest(body: unknown, cursorModel: { id: string } | 
   const messages = expectArray(record.messages, "messages");
   validateCommonUnsupported(record);
   if (record.tools !== undefined && record.tool_choice !== "none") {
-    throw new HttpError("OpenAI tool calls are not supported by this Cursor Cursor adapter adapter.", 400, "unsupported_parameter", "tools");
+    throw new HttpError("OpenAI tool calls are not supported by this Cursor adapter.", 400, "unsupported_parameter", "tools");
   }
   if (record.functions !== undefined) {
     throw new HttpError("Legacy function calling is not supported by this adapter.", 400, "unsupported_parameter", "functions");
@@ -63,7 +63,7 @@ export function prepareResponsesRequest(body: unknown, cursorModel: { id: string
   const record = expectRecord(body, "body");
   validateCommonUnsupported(record);
   if (Array.isArray(record.tools) && record.tools.length > 0) {
-    throw new HttpError("OpenAI Responses tools are not supported by this Cursor Cursor adapter adapter.", 400, "unsupported_parameter", "tools");
+    throw new HttpError("OpenAI Responses tools are not supported by this Cursor adapter.", 400, "unsupported_parameter", "tools");
   }
   if (record.background === true) {
     throw new HttpError("background responses are not supported.", 400, "unsupported_parameter", "background");
@@ -333,7 +333,7 @@ function validateCommonUnsupported(record: Record<string, unknown>) {
     throw new HttpError("Only n=1 is supported.", 400, "unsupported_parameter", "n");
   }
   if (record.logprobs === true || record.top_logprobs !== undefined) {
-    throw new HttpError("logprobs are not available through Cursor's Cursor adapter API.", 400, "unsupported_parameter", "logprobs");
+    throw new HttpError("logprobs are not available through Cursor's API.", 400, "unsupported_parameter", "logprobs");
   }
   if (Array.isArray(record.modalities) && record.modalities.some((value) => value !== "text")) {
     throw new HttpError("Only text output is supported.", 400, "unsupported_parameter", "modalities");

@@ -9,7 +9,8 @@ function makeEnv(db: FakeD1, assetsFetch: Fetcher["fetch"] = () => Promise.resol
     ASSETS: { fetch: assetsFetch } as unknown as Fetcher,
     ENCRYPTION_KEY: "test-encryption-secret-with-enough-entropy",
     CURSOR_API_BASE: "https://api.cursor.test",
-    CURSOR_BACKEND_BASE_URL: "https://cursor-backend.test"
+    CURSOR_BACKEND_BASE_URL: "https://cursor-backend.test",
+    CURSOR_CHAT_ENDPOINT: "/test-cursor-chat"
   };
 }
 
@@ -406,7 +407,7 @@ function fakeDeps(): { deps: Deps; exchangeAuthHeaders: string[]; chatAuthHeader
         exchangeAuthHeaders.push(auth);
         return Response.json({ accessToken: "cursor_access_token" });
       }
-      if (url.pathname === "/private-cursor-chat-endpoint" && init?.method === "POST") {
+      if (url.pathname === "/test-cursor-chat" && init?.method === "POST") {
         const headers = new Headers(init.headers);
         chatAuthHeaders.push(auth);
         chatRequestHeaders.push(headers);
