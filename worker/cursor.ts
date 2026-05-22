@@ -84,9 +84,10 @@ export const cursorTestExports = {
 };
 
 export type CursorTextEvent =
+  | { type: "reasoning"; text: string }
   | { type: "text"; text: string }
   | { type: "tool_call"; toolCall: CursorToolCall }
-  | { type: "done"; finalText: string; toolCalls: CursorToolCall[] };
+  | { type: "done"; finalText: string; reasoningText?: string; toolCalls: CursorToolCall[] };
 
 export async function* streamCursorText(response: Response): AsyncGenerator<CursorTextEvent> {
   const contentType = response.headers.get("content-type") || "";
@@ -96,6 +97,7 @@ export async function* streamCursorText(response: Response): AsyncGenerator<Curs
   }
 
   let text = "";
+  let reasoningText = "";
   const toolCalls: CursorToolCall[] = [];
   const thinking = new ThinkingTextExtractor();
   const output = new ComposerOutputFilter();
@@ -128,13 +130,22 @@ export async function* streamCursorText(response: Response): AsyncGenerator<Curs
     }
     if (event.type === "thinking" && event.text) {
       for (const delta of thinking.push(event.text)) {
-        yield* emit(delta);
+        if (delta.type === "reasoning") {
+          reasoningText += delta.text;
+          yield delta;
+        } else {
+          yield* emit(delta.text);
+        }
       }
     }
   }
-  const flushed = thinking.flush();
-  if (flushed) {
-    yield* emit(flushed);
+  for (const delta of thinking.flush()) {
+    if (delta.type === "reasoning") {
+      reasoningText += delta.text;
+      yield delta;
+    } else {
+      yield* emit(delta.text);
+    }
   }
   for (const delta of output.flush()) {
     for (const event of toolMarkers.push(delta)) {
@@ -156,7 +167,7 @@ export async function* streamCursorText(response: Response): AsyncGenerator<Curs
       yield event;
     }
   }
-  yield { type: "done", finalText: text, toolCalls };
+  yield { type: "done", finalText: text, ...(reasoningText ? { reasoningText } : {}), toolCalls };
 }
 
 async function* streamLegacyAgentText(response: Response): AsyncGenerator<CursorTextEvent> {
@@ -242,21 +253,25 @@ async function* streamLegacyAgentText(response: Response): AsyncGenerator<Cursor
 
 export interface CursorCollectedOutput {
   text: string;
+  reasoningText: string;
   toolCalls: CursorToolCall[];
 }
 
 export async function collectCursorOutput(response: Response): Promise<CursorCollectedOutput> {
   let text = "";
+  let reasoningText = "";
   let toolCalls: CursorToolCall[] = [];
   for await (const event of streamCursorText(response)) {
+    if (event.type === "reasoning" && event.text) reasoningText += event.text;
     if (event.type === "text" && event.text) text += event.text;
     if (event.type === "tool_call") toolCalls.push(event.toolCall);
     if (event.type === "done") {
       text = event.finalText;
+      reasoningText = event.reasoningText ?? "";
       toolCalls = event.toolCalls;
     }
   }
-  return { text, toolCalls };
+  return { text, reasoningText, toolCalls };
 }
 
 export async function collectCursorText(response: Response): Promise<string> {
@@ -883,31 +898,42 @@ function decodeBinaryToolCall(_payload: Uint8Array): { toolCall: CursorToolCall 
   return {};
 }
 
+type ThinkingDelta = { type: "reasoning"; text: string } | { type: "text"; text: string };
+
 class ThinkingTextExtractor {
   private buffer = "";
   private open = true;
 
-  push(delta: string): string[] {
-    if (!this.open) return [delta];
+  push(delta: string): ThinkingDelta[] {
+    if (!this.open) return [{ type: "text", text: delta }];
     this.buffer += delta;
     const marker = this.findFinalMarker();
     if (!marker) return [];
     this.open = false;
+    const before = this.buffer.slice(0, marker.index).replace(COMPOSER_CONTROL_TOKEN_PATTERN, "");
     const after = this.buffer.slice(marker.index + marker.length).replace(/^\s+/, "");
     this.buffer = "";
-    return after ? [after] : [];
+    return [
+      ...(before ? [{ type: "reasoning" as const, text: before }] : []),
+      ...(after ? [{ type: "text" as const, text: after }] : [])
+    ];
   }
 
-  flush(): string {
-    if (!this.open) return "";
+  flush(): ThinkingDelta[] {
+    if (!this.open) return [];
     const marker = this.findFinalMarker();
     if (marker) {
+      const before = this.buffer.slice(0, marker.index).replace(COMPOSER_CONTROL_TOKEN_PATTERN, "");
       const after = this.buffer.slice(marker.index + marker.length).replace(/^\s+/, "");
       this.buffer = "";
-      return after;
+      return [
+        ...(before ? [{ type: "reasoning" as const, text: before }] : []),
+        ...(after ? [{ type: "text" as const, text: after }] : [])
+      ];
     }
+    const reasoning = this.buffer;
     this.buffer = "";
-    return "";
+    return reasoning ? [{ type: "reasoning", text: reasoning }] : [];
   }
 
   private findFinalMarker(): { index: number; length: number } | null {

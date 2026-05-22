@@ -88,7 +88,7 @@ describe("Cursor stream adapter", () => {
     ]);
   });
 
-  it("strips Composer thinking before yielding final Cursor text", async () => {
+  it("emits Composer thinking as reasoning before yielding final Cursor text", async () => {
     const response = new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {
@@ -103,12 +103,13 @@ describe("Cursor stream adapter", () => {
     const events = [];
     for await (const event of streamCursorText(response)) events.push(event);
     expect(events).toEqual([
+      { type: "reasoning", text: "The user asked for OK.\n" },
       { type: "text", text: "OK" },
-      { type: "done", finalText: "OK", toolCalls: [] }
+      { type: "done", finalText: "OK", reasoningText: "The user asked for OK.\n", toolCalls: [] }
     ]);
   });
 
-  it("strips Composer final markers when there is no think closing tag", async () => {
+  it("emits reasoning before Composer final markers", async () => {
     const response = new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {
@@ -122,8 +123,9 @@ describe("Cursor stream adapter", () => {
     const events = [];
     for await (const event of streamCursorText(response)) events.push(event);
     expect(events).toEqual([
+      { type: "reasoning", text: "Hidden reasoning " },
       { type: "text", text: "Visible answer" },
-      { type: "done", finalText: "Visible answer", toolCalls: [] }
+      { type: "done", finalText: "Visible answer", reasoningText: "Hidden reasoning ", toolCalls: [] }
     ]);
   });
 

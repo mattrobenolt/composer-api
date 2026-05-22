@@ -102,6 +102,7 @@ async function handleOpenAiRoute(
         created,
         model: prepared.model,
         text: output.text,
+        reasoningText: output.reasoningText,
         toolCalls,
         promptChars: prepared.promptChars,
         metadata: prepared.responseMetadata
@@ -140,6 +141,7 @@ function streamOpenAiResponse(
   const writer = writable.getWriter();
   const pump = async () => {
     let text = "";
+    let reasoningText = "";
     let toolCallCount = 0;
     let finishReason: "stop" | "tool_calls" = "stop";
     const streamedToolCalls: ReturnType<typeof toOpenAiToolCalls> = [];
@@ -151,6 +153,10 @@ function streamOpenAiResponse(
       }
 
       for await (const event of streamCursorText(cursorStream)) {
+        if (event.type === "reasoning" && event.text) {
+          reasoningText += event.text;
+          if (kind === "chat") await writer.write(chatChunk({ id: input.id, created: input.created, model: input.model, reasoningDelta: event.text }));
+        }
         if (event.type === "text" && event.text) {
           text += event.text;
           if (kind === "chat") await writer.write(chatChunk({ id: input.id, created: input.created, model: input.model, delta: event.text }));
@@ -172,6 +178,7 @@ function streamOpenAiResponse(
         }
         if (event.type === "done") {
           text = event.finalText;
+          reasoningText = event.reasoningText ?? "";
         }
       }
 

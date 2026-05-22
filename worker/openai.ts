@@ -173,6 +173,7 @@ export function chatCompletionResponse(input: {
   created: number;
   model: string;
   text: string;
+  reasoningText?: string;
   toolCalls?: OpenAiToolCall[];
   promptChars: number;
   metadata?: Record<string, unknown>;
@@ -190,6 +191,7 @@ export function chatCompletionResponse(input: {
         message: {
           role: "assistant",
           content: toolCalls.length && !input.text ? null : input.text,
+          ...(input.reasoningText ? { reasoning_content: input.reasoningText } : {}),
           ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
           refusal: null,
           annotations: []
@@ -271,6 +273,7 @@ export function chatChunk(input: {
   created: number;
   model: string;
   delta?: string;
+  reasoningDelta?: string;
   role?: "assistant";
   toolCall?: { index: number; value: OpenAiToolCall };
   finish?: boolean;
@@ -281,6 +284,7 @@ export function chatChunk(input: {
     : {
         ...(input.role ? { role: input.role } : {}),
         ...(input.delta ? { content: input.delta } : {}),
+        ...(input.reasoningDelta ? { reasoning_content: input.reasoningDelta } : {}),
         ...(input.toolCall
           ? {
               tool_calls: [

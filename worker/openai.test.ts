@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepareChatRequest, prepareResponsesRequest, chatCompletionResponse, chatUsageChunk, responseObject, toOpenAiToolCalls } from "./openai";
+import { prepareChatRequest, prepareResponsesRequest, chatCompletionResponse, chatChunk, chatUsageChunk, responseObject, toOpenAiToolCalls } from "./openai";
 
 describe("OpenAI compatibility adapter", () => {
   it("converts chat messages and image URLs into Cursor prompts", () => {
@@ -182,6 +182,23 @@ describe("OpenAI compatibility adapter", () => {
         }
       }
     });
+
+    const chatWithReasoning = chatCompletionResponse({
+      id: "chatcmpl_test",
+      created: 1,
+      model: "composer-2.5",
+      text: "hello",
+      reasoningText: "thinking",
+      promptChars: 20
+    });
+    expect(chatWithReasoning).toMatchObject({
+      choices: [{ message: { content: "hello", reasoning_content: "thinking" } }]
+    });
+
+    const reasoningChunk = new TextDecoder().decode(
+      chatChunk({ id: "chatcmpl_test", created: 1, model: "composer-2.5", reasoningDelta: "thinking" })
+    );
+    expect(reasoningChunk).toContain('"reasoning_content":"thinking"');
 
     const response = responseObject({
       id: "resp_test",
