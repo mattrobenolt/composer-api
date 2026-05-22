@@ -128,6 +128,8 @@ print(response.output_text)
 
 ## OpenCode
 
+![Composer 2.5 in OpenCode](/opencode-composer-2-5.webp)
+
 OpenCode should use the hosted OpenCode route, not the generic `/v1` route. The OpenCode route is still a normal OpenAI-compatible Chat Completions API, but it preserves OpenCode's local tool loop: the proxy turns Cursor tool-call output into `tool_calls`, and OpenCode executes those tools in your project.
 
 Streaming requests return the final OpenAI-style usage chunk when OpenCode asks for usage. Token counts are estimated from the prompt and output text, and the displayed cost uses Cursor's published Composer 2.5 standard rate.

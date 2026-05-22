@@ -18,6 +18,14 @@ describe("markdown renderer", () => {
     expect(result.html).not.toContain("<script>");
   });
 
+  it("renders safe image blocks", () => {
+    const result = renderMarkdown("![Composer 2.5 in OpenCode](/opencode-composer-2-5.webp)");
+
+    expect(result.html).toContain('<figure class="md-image">');
+    expect(result.html).toContain('src="/opencode-composer-2-5.webp"');
+    expect(result.html).toContain('alt="Composer 2.5 in OpenCode"');
+  });
+
   it("renders tabbed code samples and relative links", () => {
     const result = renderMarkdown(
       [

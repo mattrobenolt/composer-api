@@ -125,6 +125,16 @@ export function renderMarkdown(markdown: string, options: MarkdownOptions = {}):
       continue;
     }
 
+    const image = /^!\[([^\]]*)\]\(((?:\/|https?:\/\/)[^)\s]+)\)$/.exec(line.trim());
+    if (image) {
+      flushParagraph();
+      flushList();
+      html.push(
+        `<figure class="md-image"><img src="${escapeAttr(image[2])}" alt="${escapeAttr(image[1])}" loading="lazy" /></figure>`
+      );
+      continue;
+    }
+
     const unordered = /^\s*[-*]\s+(.+)$/.exec(line);
     const ordered = /^\s*\d+\.\s+(.+)$/.exec(line);
     if (unordered || ordered) {

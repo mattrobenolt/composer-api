@@ -581,6 +581,20 @@ code {
   color: var(--cyan);
 }
 
+.md-image {
+  margin: 4px 0 22px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.md-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
