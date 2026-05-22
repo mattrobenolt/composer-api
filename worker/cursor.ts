@@ -908,15 +908,22 @@ class ThinkingTextExtractor {
     if (!this.open) return [{ type: "text", text: delta }];
     this.buffer += delta;
     const marker = this.findFinalMarker();
-    if (!marker) return [];
-    this.open = false;
-    const before = this.buffer.slice(0, marker.index).replace(COMPOSER_CONTROL_TOKEN_PATTERN, "");
-    const after = this.buffer.slice(marker.index + marker.length).replace(/^\s+/, "");
-    this.buffer = "";
-    return [
-      ...(before ? [{ type: "reasoning" as const, text: before }] : []),
-      ...(after ? [{ type: "text" as const, text: after }] : [])
-    ];
+    if (marker) {
+      this.open = false;
+      const before = this.buffer.slice(0, marker.index).replace(COMPOSER_CONTROL_TOKEN_PATTERN, "");
+      const after = this.buffer.slice(marker.index + marker.length).replace(/^\s+/, "");
+      this.buffer = "";
+      return [
+        ...(before ? [{ type: "reasoning" as const, text: before }] : []),
+        ...(after ? [{ type: "text" as const, text: after }] : [])
+      ];
+    }
+
+    const keep = controlTokenPrefixLength(this.buffer);
+    if (keep === this.buffer.length) return [];
+    const reasoning = this.buffer.slice(0, this.buffer.length - keep);
+    this.buffer = this.buffer.slice(this.buffer.length - keep);
+    return reasoning ? [{ type: "reasoning", text: reasoning }] : [];
   }
 
   flush(): ThinkingDelta[] {

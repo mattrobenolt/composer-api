@@ -103,7 +103,8 @@ describe("Cursor stream adapter", () => {
     const events = [];
     for await (const event of streamCursorText(response)) events.push(event);
     expect(events).toEqual([
-      { type: "reasoning", text: "The user asked for OK.\n" },
+      { type: "reasoning", text: "The user asked for OK." },
+      { type: "reasoning", text: "\n" },
       { type: "text", text: "OK" },
       { type: "done", finalText: "OK", reasoningText: "The user asked for OK.\n", toolCalls: [] }
     ]);
